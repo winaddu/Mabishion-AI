@@ -3,16 +3,16 @@
 // SPDX-License-Identifier: MIT
 
 #[cfg(feature = "sqlite")]
-use std::fs::{create_dir_all, read_to_string, write};
-#[cfg(feature = "sqlite")]
 use std::collections::HashMap;
+#[cfg(feature = "sqlite")]
+use std::fs::{create_dir_all, read_to_string, write};
 
 use indexmap::IndexMap;
 use serde_json::Value as JsonValue;
-#[cfg(any(feature = "sqlite", feature = "mysql", feature = "postgres"))]
-use sqlx::{Column, Connection, Executor, Pool, Row};
 #[cfg(feature = "sqlite")]
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
+#[cfg(any(feature = "sqlite", feature = "mysql", feature = "postgres"))]
+use sqlx::{Column, Connection, Executor, Pool, Row};
 #[cfg(feature = "sqlite")]
 use std::str::FromStr;
 #[cfg(any(feature = "sqlite", feature = "mysql", feature = "postgres"))]
@@ -324,7 +324,9 @@ impl DbPool {
 #[cfg(feature = "sqlite")]
 async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), crate::Error> {
     let path = std::path::PathBuf::from(
-        conn_url.strip_prefix("sqlite:").ok_or_else(|| crate::Error::InvalidDbUrl(conn_url.to_string()))?,
+        conn_url
+            .strip_prefix("sqlite:")
+            .ok_or_else(|| crate::Error::InvalidDbUrl(conn_url.to_string()))?,
     );
     if !path.exists() {
         return Ok(());
@@ -352,15 +354,20 @@ async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), cra
     sqlx::query("SELECT sqlcipher_export('encrypted')")
         .execute(&mut plain)
         .await?;
-    sqlx::query("DETACH DATABASE encrypted").execute(&mut plain).await?;
+    sqlx::query("DETACH DATABASE encrypted")
+        .execute(&mut plain)
+        .await?;
     plain.close().await?;
 
-    let encrypted_options = SqliteConnectOptions::from_str(&format!("sqlite:{}", tmp.to_string_lossy()))
-        .map_err(crate::Error::Sql)?
-        .pragma("key", key.to_owned())
-        .create_if_missing(false);
+    let encrypted_options =
+        SqliteConnectOptions::from_str(&format!("sqlite:{}", tmp.to_string_lossy()))
+            .map_err(crate::Error::Sql)?
+            .pragma("key", key.to_owned())
+            .create_if_missing(false);
     let mut encrypted = SqliteConnection::connect_with(&encrypted_options).await?;
-    sqlx::query("SELECT count(*) FROM sqlite_master").execute(&mut encrypted).await?;
+    sqlx::query("SELECT count(*) FROM sqlite_master")
+        .execute(&mut encrypted)
+        .await?;
     encrypted.close().await?;
 
     std::fs::rename(&path, &backup).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
@@ -376,8 +383,10 @@ async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), cra
 fn database_key(app_path: &std::path::Path) -> Result<String, crate::Error> {
     let path = app_path.join("secrets.json");
     let mut store: HashMap<String, String> = if path.exists() {
-        serde_json::from_str(&read_to_string(&path).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?)
-            .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?
+        serde_json::from_str(
+            &read_to_string(&path).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?,
+        )
+        .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?
     } else {
         HashMap::new()
     };
@@ -390,13 +399,17 @@ fn database_key(app_path: &std::path::Path) -> Result<String, crate::Error> {
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut bytes);
     let key = bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
     store.insert("db_encryption_key".to_string(), key.clone());
-    let text = serde_json::to_string_pretty(&store).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
+    let text = serde_json::to_string_pretty(&store)
+        .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
     write(path, text).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(app_path.join("secrets.json"), std::fs::Permissions::from_mode(0o600))
-            .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
+        std::fs::set_permissions(
+            app_path.join("secrets.json"),
+            std::fs::Permissions::from_mode(0o600),
+        )
+        .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
     }
     Ok(key)
 }

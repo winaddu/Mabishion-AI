@@ -1716,3 +1716,9 @@ What changed: Executed a standalone SQLCipher runtime test using the same `libsq
 Why changed: Native Tauri runtime could not launch in this environment because GTK/GLib linker packages are missing; this isolates and verifies the database encryption/export behavior independently.
 Status: Working — smoke output `SQLCIPHER_SMOKE_OK header_encrypted=true value_preserved=true`. Native desktop migration and packaging remain unverified.
 Next step: Run the same migration through the Tauri app on a machine with GTK/GLib development dependencies, then inspect the installed app and encrypted database on disk.
+
+[2026-10-21] [12:47] — [Codex] — [src-tauri/capabilities/default.json]
+What changed: Removed the unused shell plugin default and execute permissions from the desktop capability set while preserving shell open permission for external links. Local command execution remains available only through the Rust command path guarded by the approval engine.
+Why changed: Capability audit found a broad shell execute surface that was not used by any frontend caller and duplicated the approval-gated runtime command.
+Status: Working — `cargo check --offline` passes and unit tests pass (207 tests). Full build/E2E behavior remains covered by the prior green run.
+Next step: Re-run production build and E2E after the capability change, then complete native packaging on a GTK/GLib-enabled environment.
