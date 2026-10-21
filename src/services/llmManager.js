@@ -278,11 +278,11 @@ async function callOllama(_apiKey, prompt, systemInstruction) {
     }
   });
 
-  const text = data.choices?.[0]?.message?.content || '';
+  const text = data?.choices?.[0]?.message?.content || '';
   if (!text) throw new Error('Empty Ollama response');
-  const promptTokens = data.usage?.prompt_tokens || 0;
-  const completionTokens = data.usage?.completion_tokens || 0;
-  const totalTokens = data.usage?.total_tokens || 0;
+  const promptTokens = data?.usage?.prompt_tokens || 0;
+  const completionTokens = data?.usage?.completion_tokens || 0;
+  const totalTokens = data?.usage?.total_tokens || 0;
 
   return { text, promptTokens, completionTokens, totalTokens, model };
 }

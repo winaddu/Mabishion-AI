@@ -112,6 +112,13 @@ Three tiers, enforced per worker policy:
 - `cronService.js` additionally nags via WhatsApp if CRITICAL items sit pending > 2 hours (every 4h check).
 - **Approval gates are sacred. Never bypass, never lower a worker's tier without owner sign-off.**
 
+### Approval Gate Exemption from Agent Tool Timeouts (Verified — 2026-10-21)
+Any agent dispatcher (e.g. `cortex.js`) wrapping tool executions with timeouts MUST exempt approval-gated tools (`mickii_fs_create`, `mickii_fs_write`, `mickii_fs_delete`, `mickii_shell_run`, `mickii_ftp_write`, `mickii_cpanel_deploy`, `mickii_request_boss_approval`). Critical actions suspend until human resolution and must never race against a client-side timeout.
+
+### Explicit Expiration for Approval Records (Verified — 2026-10-21)
+- `type: 'critical'`: `expires_at` MUST be `NULL` (never a timestamp).
+- `type: 'standard'`: `expires_at` MUST be set to `now + 24 hours` for automated escalation.
+
 ## 7. Data Layer Rules (Verified)
 
 - Schema lives in `src/data/core.js` (base tables) + `src/data/db_schema_upgrade.js` (migrations) — 50+ tables including: `projects`, `blueprints`, `leads`, `clients`, `approvals`, `action_ledger`, `settings`, `revenue`, `llm_usage`, `cron_logs`, `workflows(+nodes+connections)`, `invoices`, `payments`, `documents`, `tasks`, `worker_executions`, `cost_logs`, `consents`, `audit_logs`, `execution_spans`, `products`, `communications`, `rate_limit_log`.

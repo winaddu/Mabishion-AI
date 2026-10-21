@@ -299,7 +299,7 @@ export class LLMProvider {
       return payload;
     };
     const parseOpenAIResponse = (label) => (data) => {
-      if (!data.choices || !data.choices[0])
+      if (!data || !data.choices || !data.choices[0])
         throw new Error(`Empty ${label} response`);
       const message = data.choices[0].message;
       if (message?.tool_calls && message.tool_calls.length > 0) {
@@ -417,7 +417,7 @@ export class LLMProvider {
           return payload;
         },
         parseResponse: (data) => {
-          if (!data.candidates || !data.candidates[0])
+          if (!data || !data.candidates || !data.candidates[0])
             throw new Error("Empty Gemini response");
           const candidate = data.candidates[0];
           const contentParts = candidate.content?.parts || [];
@@ -471,7 +471,7 @@ export class LLMProvider {
           return payload;
         },
         parseResponse: (data) => {
-          if (!data.choices || !data.choices[0])
+          if (!data || !data.choices || !data.choices[0])
             throw new Error("Empty Groq response");
           const message = data.choices[0].message;
           // CRITICAL FIX: Handle tool call responses from Groq
@@ -519,7 +519,7 @@ export class LLMProvider {
           return payload;
         },
         parseResponse: (data) => {
-          if (!data.choices?.[0]) throw new Error("Empty NVIDIA response");
+          if (!data || !data.choices?.[0]) throw new Error("Empty NVIDIA response");
           const message = data.choices[0].message;
           // CRITICAL FIX: Handle tool call responses from NIM
           if (message?.tool_calls && message.tool_calls.length > 0) {
@@ -890,17 +890,28 @@ export class Cortex {
             }
 
             if (hooks.onToolStart) hooks.onToolStart({ name, args });
-            let observation;
+            const isApprovalGated = [
+              'mickii_fs_create',
+              'mickii_fs_write',
+              'mickii_fs_delete',
+              'mickii_shell_run',
+              'mickii_ftp_write',
+              'mickii_cpanel_deploy',
+              'mickii_request_boss_approval'
+            ].includes(name);
+
             try {
-              const result = await Promise.race([
-                this.runtime.dispatch(name, args),
-                new Promise((_, rej) =>
-                  setTimeout(
-                    () => rej(new Error(`Tool ${name} timed out after 60s`)),
-                    60000,
-                  ),
-                ),
-              ]);
+              const result = await (isApprovalGated
+                ? this.runtime.dispatch(name, args)
+                : Promise.race([
+                    this.runtime.dispatch(name, args),
+                    new Promise((_, rej) =>
+                      setTimeout(
+                        () => rej(new Error(`Tool ${name} timed out after 60s`)),
+                        60000,
+                      ),
+                    ),
+                  ]));
               observation =
                 typeof result === "string" ? result : JSON.stringify(result);
               try { collectImages(result); } catch (_) {}

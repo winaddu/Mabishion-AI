@@ -338,6 +338,8 @@ async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), cra
 
     let tmp = path.with_extension("db.encrypted.tmp");
     let backup = path.with_extension("db.plaintext.backup");
+    let wal = path.parent().unwrap_or(&path).join(format!("{}-wal", path.file_name().unwrap_or_default().to_string_lossy()));
+    let shm = path.parent().unwrap_or(&path).join(format!("{}-shm", path.file_name().unwrap_or_default().to_string_lossy()));
     let _ = std::fs::remove_file(&tmp);
     let _ = std::fs::remove_file(&backup);
 
@@ -375,6 +377,8 @@ async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), cra
         let _ = std::fs::rename(&backup, &path);
         return Err(crate::Error::InvalidDbUrl(error.to_string()));
     }
+    let _ = std::fs::remove_file(&wal);
+    let _ = std::fs::remove_file(&shm);
     std::fs::remove_file(&backup).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
     Ok(())
 }
@@ -383,10 +387,12 @@ async fn migrate_plaintext_database(conn_url: &str, key: &str) -> Result<(), cra
 fn database_key(app_path: &std::path::Path) -> Result<String, crate::Error> {
     let path = app_path.join("secrets.json");
     let mut store: HashMap<String, String> = if path.exists() {
-        serde_json::from_str(
-            &read_to_string(&path).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?,
-        )
-        .map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?
+        let content = read_to_string(&path).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?;
+        if content.trim().is_empty() {
+            HashMap::new()
+        } else {
+            serde_json::from_str(&content).map_err(|e| crate::Error::InvalidDbUrl(e.to_string()))?
+        }
     } else {
         HashMap::new()
     };

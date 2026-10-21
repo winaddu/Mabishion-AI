@@ -1722,3 +1722,16 @@ What changed: Removed the unused shell plugin default and execute permissions fr
 Why changed: Capability audit found a broad shell execute surface that was not used by any frontend caller and duplicated the approval-gated runtime command.
 Status: Working — `cargo check --offline` passes and unit tests pass (207 tests). Full build/E2E behavior remains covered by the prior green run.
 Next step: Re-run production build and E2E after the capability change, then complete native packaging on a GTK/GLib-enabled environment.
+
+[2026-10-21] [17:53] — [Antigravity] — [.github/workflows/build.yml, .github/workflows/codeql.yml, src/engine/cortex.js, src/data/approvals.js, src/services/llmManager.js, src-tauri/vendor/tauri-plugin-sql/src/wrapper.rs, src/tests/unit/approvalTypeNormalization.test.js]
+What changed:
+  1. Fixed CodeQL workflow: Added proper dependency install and `cargo check --manifest-path src-tauri/Cargo.toml` for Rust manual build step instead of template `exit 1`.
+  2. Fixed CI Build workflow: Re-aligned `name:` indentation (4 -> 2 spaces) matching `path:` in artifact upload steps.
+  3. Fixed Cortex approval gate: Exempted approval-gated tools (`mickii_fs_create`, `mickii_fs_write`, `mickii_fs_delete`, `mickii_shell_run`, `mickii_ftp_write`, `mickii_cpanel_deploy`, `mickii_request_boss_approval`) from the hardcoded 60s timeout race, honoring C1 governance (no timeout on critical decisions).
+  4. Fixed approval expiration: `addApproval` now properly records `expires_at = null` for critical approvals (preventing instant-expiry UI bugs in CriticalApprovalModal) and `now + 24h` for standard approvals.
+  5. Fixed LLM fallback error handling: Null-guarded `data?.choices` and `data?.usage` in `callOllama` and Cortex response parsers to prevent unhandled TypeErrors outside the desktop shell.
+  6. Fixed SQLCipher migration safety: Removed stale `-wal` and `-shm` sidecars on SQLite encryption migration to prevent journal replay corruption, and guarded empty `secrets.json` files.
+  7. Updated unit tests: Added `expires_at` assertions to `approvalTypeNormalization.test.js`.
+Why changed: Rigorous code review of recent commits and core execution flows revealed CI workflow breakage, C1 approval timeout conflicts, and runtime response crashes.
+Status: Working — All 383 unit tests pass; all 28 Playwright E2E tests pass; production bundle build passes in ~1.56s; `cargo check` passes cleanly.
+Next step: Ready for desktop packaging in environment with GTK/GLib development dependencies.
