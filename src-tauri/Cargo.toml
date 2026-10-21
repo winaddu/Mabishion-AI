@@ -10,7 +10,8 @@ tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
 tauri = { version = "2.0.0", features = [] }
-tauri-plugin-sql = { version = "2.0.0", features = ["sqlite"] }
+tauri-plugin-sql = { path = "vendor/tauri-plugin-sql", features = ["sqlite"] }
+libsqlite3-sys = { version = "0.30", features = ["bundled-sqlcipher"] }
 tauri-plugin-fs = "2.0.0"
 tauri-plugin-shell = "2.0.0"
 serde = { version = "1", features = ["derive"] }

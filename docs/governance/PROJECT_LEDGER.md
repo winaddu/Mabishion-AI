@@ -1704,3 +1704,9 @@ What changed: Attempted a production Tauri release build with `npx tauri build -
 Why changed: Verify the native desktop integration in addition to the browser production build.
 Status: Blocked — frontend build and all 383 tests pass, but native release compilation stops at `glib-sys` because `pkg-config` is not installed in the environment. HawkScan is also unavailable. No system package was installed.
 Next step: Provide `pkg-config` and GTK/GLib development dependencies in the build environment, then rerun native packaging; SQLCipher key lifecycle/migration remains unresolved.
+
+[2026-10-21] [12:45] — [Codex] — [src-tauri/Cargo.toml, src-tauri/Cargo.lock, src-tauri/vendor/tauri-plugin-sql, docs/governance/PROJECT_RULES.md]
+What changed: Vendored the Tauri SQL plugin and enabled bundled SQLCipher. Native connections now create/read a per-install 256-bit key from the Tauri secret store, apply the key before SQLite access, and migrate an existing plaintext database through SQLCipher export with temporary-file verification and rollback-safe replacement. Updated architecture documentation to reflect the actual encryption mode.
+Why changed: The project had plain SQLite despite the local-first security requirement. The stock Tauri plugin did not expose a key hook, so a minimal local fork was required while preserving the `@tauri-apps/plugin-sql` API and SQLite architecture.
+Status: Working — `cargo check --offline` passes, frontend build passes with all 383 tests. Runtime migration against a live installed desktop database is not yet exercised because native GTK/GLib linker packages are absent; the release build remains environment-blocked. SQLCipher uses its documented AES-256-CBC/HMAC mode, not AES-GCM.
+Next step: Run a desktop migration smoke test in an environment with GTK/GLib development packages, then package the Tauri application and inspect encrypted database headers.

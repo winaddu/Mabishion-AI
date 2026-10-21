@@ -26,7 +26,7 @@
 | Frontend | React 18 + Vite 8 + Tailwind CSS 3 | `package.json`, `vite.config.js` (port 1420, strictPort). Vite 8 uses the rolldown/oxc bundler; esbuild removed as a direct dep (2026-07-15). |
 | State | **React Context only** (`src/context/BuildContext.jsx`) — Zustand is NOT installed | `package.json` has no zustand |
 | Routing | React Router v6 (~30 routes in `src/App.jsx`) | `App.jsx` |
-| Database | SQLite `mabishion.db` via `@tauri-apps/plugin-sql`; plain (SQLCipher NOT yet applied) | `src/data/db.js`, `core.js`, `db_schema_upgrade.js` |
+| Database | SQLite `mabishion.db` via the local `tauri-plugin-sql` fork; SQLCipher bundled with per-install key and plaintext-to-encrypted migration | `src/data/core.js`, `src-tauri/vendor/tauri-plugin-sql`, `src-tauri/Cargo.toml` |
 | Reasoning | `src/engine/cortex.js` — ReAct loop, `MAX_ITERATIONS = 12` | `cortex.js` |
 | Workers | **24 workers** (WK-001 … WK-024) extending `BaseWorker` | `src/engine/workers/index.js` |
 | File generation | jsPDF + JSZip (browser-side), Tauri dialog/fs plugins for native save | `fileOperationService.js` |
@@ -118,7 +118,7 @@ Three tiers, enforced per worker policy:
 - Data-access modules are domain-split: `approvals.js`, `clients.js`, `commerce.js`, `core.js`, `knowledge.js`, `marketing.js`, `pipeline.js`, `security.js`, `system.js`. **Add queries to the matching domain file — do not create new duplicate helpers.**
 - Parameterized queries only (there is a `sanitizeSql` unit test guarding this).
 - Schema changes go through `db_schema_upgrade.js` with `schema_version` tracking — never ad-hoc `ALTER TABLE` inside workers/screens.
-- Database is currently **plain SQLite**. SQLCipher/AES-256 is a planned Phase-3 item, not reality.
+- Database encryption is implemented in the native SQL plugin fork with SQLCipher's bundled AES-256-CBC/HMAC mode. A per-install 256-bit key is created in the existing Tauri secret store; an existing plaintext database is exported to a verified encrypted temporary file before atomic replacement. The project rule's earlier AES-256-GCM wording is not supported by SQLCipher and must not be claimed as implemented.
 
 ## 8. Secrets & Security (Verified)
 
