@@ -4,16 +4,15 @@ import { test, expect } from '@playwright/test';
 //  - Sending a free-text message from the landing view must show the message and
 //    switch into the conversation view. Previously the message vanished because
 //    the chat thread only rendered in the 'build' view, not the landing.
-//  - The 4 service categories render on the landing (the build entry point).
+//  - The 3 owner-approved service categories render on the landing (the build entry point).
 test.describe('Playground chat', () => {
-  test('landing shows the build playground and 4 service categories', async ({ page }) => {
+  test('landing shows the build playground and 3 service categories', async ({ page }) => {
     await page.goto('/build-new');
     await page.waitForTimeout(1500);
 
     await expect(page.getByText('What are we building?')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Digital Marketing')).toBeVisible();
     await expect(page.getByText('Website Development')).toBeVisible();
-    await expect(page.getByText('Custom Software Development')).toBeVisible();
     await expect(page.getByText('AI Development')).toBeVisible();
   });
 

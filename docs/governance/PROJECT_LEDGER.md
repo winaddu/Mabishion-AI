@@ -1680,3 +1680,9 @@ What changed: Database backups now discover and export all SQLite user tables, f
 Why changed: Owner requested the project be completed and fully working. Review found exports only covered 15 hardcoded tables while the app schema has substantially more, and restore accepted SQL identifiers directly from backup JSON.
 Status: Working — 372 tests pass; npm run build passes. Existing large-bundle and dynamic-import warnings remain. HawkScan could not run because the skill/runtime/API key is unavailable in this environment.
 Next step: Continue production-readiness audit; database encryption and PIN-gate behavior need a safe recovery design before activation.
+
+[2026-10-21] [12:35] — [Codex] — [src/data/core.js, src/data/security.js, src/tests/unit/backupRestore.test.js, src/tests/e2e/playground-chat.spec.js, playwright.config.js]
+What changed: Added complete local-preview snapshot/restore support so scheduled backups do not call SQLite introspection in browser preview; enabled an optional system Chrome executable for Playwright; aligned the Playground E2E assertion with the current three-category owner-approved catalog.
+Why changed: Browser E2E surfaced repeated scheduled-backup errors in preview mode and one stale test expecting a removed service category. The project has system Chrome installed, so the E2E suite can run without downloading a browser.
+Status: Working — 373 unit/integration tests and 28 E2E tests pass; npm run build passes. Build still reports existing bundle-size and dynamic-import warnings. HawkScan remains unavailable in this environment.
+Next step: Continue production-readiness audit; verify Tauri-shell backup/restore and address local database encryption plus PIN recovery before calling the app production-ready.

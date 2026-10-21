@@ -96,6 +96,30 @@ export function saveDevelopmentPreviewDb() {
   }
 }
 
+export function getDevelopmentPreviewDbSnapshot() {
+  return JSON.parse(JSON.stringify(developmentPreviewStore));
+}
+
+export function restoreDevelopmentPreviewDbSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    throw new Error('Invalid development preview backup.');
+  }
+  for (const [table, rows] of Object.entries(snapshot)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table) || !Array.isArray(rows)) {
+      throw new Error(`Invalid development preview table: ${table}`);
+    }
+  }
+
+  for (const table of Object.keys(developmentPreviewStore)) delete developmentPreviewStore[table];
+  Object.assign(developmentPreviewStore, JSON.parse(JSON.stringify(snapshot)));
+  settingsMap.clear();
+  for (const item of developmentPreviewStore.settings || []) {
+    if (Array.isArray(item) && item.length >= 2) settingsMap.set(item[0], item[1]);
+    else if (item && typeof item === 'object' && 'key' in item) settingsMap.set(item.key, item.value);
+  }
+  saveDevelopmentPreviewDb();
+}
+
 function createDevelopmentPreviewDb() {
   return {
     execute: async (query, params = []) => {

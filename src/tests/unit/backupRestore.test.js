@@ -1,12 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getDbMock, savePreviewMock } = vi.hoisted(() => ({
+const { getDbMock, getPreviewSnapshotMock, restorePreviewSnapshotMock, savePreviewMock } = vi.hoisted(() => ({
   getDbMock: vi.fn(),
+  getPreviewSnapshotMock: vi.fn(),
+  restorePreviewSnapshotMock: vi.fn(),
   savePreviewMock: vi.fn(),
 }));
 
 vi.mock('../../data/core.js', () => ({
   getDb: getDbMock,
+  getDevelopmentPreviewDbSnapshot: getPreviewSnapshotMock,
+  restoreDevelopmentPreviewDbSnapshot: restorePreviewSnapshotMock,
   saveDevelopmentPreviewDb: savePreviewMock,
 }));
 
@@ -50,6 +54,17 @@ describe('database backup and restore', () => {
 
     expect(Object.keys(backup)).toEqual([...tableNames].sort());
     expect(backup.new_feature_data).toEqual([{ id: 'x', payload: 'kept' }]);
+  });
+
+  it('backs up and restores the local development preview store without SQLite introspection', async () => {
+    const previewData = { projects: [], leads: [], approvals: [], settings: [], custom_preview_rows: [{ id: 'p1' }] };
+    globalThis.window = {};
+    getPreviewSnapshotMock.mockReturnValue(previewData);
+
+    expect(JSON.parse(await backupDatabase())).toEqual(previewData);
+    await expect(restoreDatabase(JSON.stringify(previewData))).resolves.toBe(true);
+    expect(restorePreviewSnapshotMock).toHaveBeenCalledWith(previewData);
+    expect(getDbMock).not.toHaveBeenCalled();
   });
 
   it('fails instead of producing a backup with an unreadable table silently emptied', async () => {

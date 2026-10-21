@@ -1,5 +1,10 @@
 // ── SECURITY domain — extracted from db.js (ARCHITECTURE v1.1 Phase 2) ──
-import { getDb, saveDevelopmentPreviewDb } from './core.js';
+import {
+  getDb,
+  getDevelopmentPreviewDbSnapshot,
+  restoreDevelopmentPreviewDbSnapshot,
+  saveDevelopmentPreviewDb,
+} from './core.js';
 import { invoke } from '@tauri-apps/api/core';
 
 const REQUIRED_BACKUP_TABLES = ['projects', 'leads', 'approvals', 'settings'];
@@ -59,6 +64,10 @@ export async function executeTransaction(queries) {
 }
 
 export async function backupDatabase() {
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    return JSON.stringify(getDevelopmentPreviewDbSnapshot(), null, 2);
+  }
+
   const db = await getDb();
   const tables = await getUserTableNames(db);
   const backupData = {};
@@ -88,11 +97,16 @@ export function validateBackupIntegrity(jsonString) {
 }
 
 export async function restoreDatabase(jsonString) {
-  const db = await getDb();
   const backupData = JSON.parse(jsonString);
   const integrity = validateBackupIntegrity(jsonString);
   if (!integrity.valid) throw new Error(`Backup integrity check failed: ${integrity.reason}`);
 
+  if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+    restoreDevelopmentPreviewDbSnapshot(backupData);
+    return true;
+  }
+
+  const db = await getDb();
   const existingTables = await getUserTableNames(db);
   const tables = Object.keys(backupData);
   const unknownTables = tables.filter(table => !existingTables.has(table));
