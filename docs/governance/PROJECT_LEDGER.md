@@ -1692,3 +1692,9 @@ What changed: Routed local file create/overwrite/delete, shell execution, FTP up
 Why changed: Runtime side effects were not consistently approval-gated, several critical waits timed out after 60–120 seconds, and "Critical" was incorrectly downgraded to STANDARD by addApproval.
 Status: Working — 202 unit tests pass, build precheck passes all 378 tests, production build passes, 28 E2E tests pass, and git diff --check is clean. HawkScan is unavailable in this environment.
 Next step: Continue release-readiness audit; SQLCipher migration/recovery and production Tauri-shell validation remain open.
+
+[2026-10-21] [12:42] — [Codex] — [src/tests/unit/runtimeCriticalApproval.test.js]
+What changed: Added direct runtime tests proving file creation, overwrite, deletion, and shell execution wait for owner approval; added a rejection test proving file writes do not execute after rejection.
+Why changed: The approval-gate refactor protects local and remote side effects and needs behavioral tests at the dispatcher boundary, not only approval-engine unit coverage.
+Status: Working — all 383 tests pass and production build passes. E2E remains 28/28 pass from this session; git diff --check is clean.
+Next step: Complete the SQLCipher/key recovery and Tauri packaging readiness review.
