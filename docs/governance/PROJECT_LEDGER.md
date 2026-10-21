@@ -1710,3 +1710,9 @@ What changed: Vendored the Tauri SQL plugin and enabled bundled SQLCipher. Nativ
 Why changed: The project had plain SQLite despite the local-first security requirement. The stock Tauri plugin did not expose a key hook, so a minimal local fork was required while preserving the `@tauri-apps/plugin-sql` API and SQLite architecture.
 Status: Working — `cargo check --offline` passes, frontend build passes with all 383 tests. Runtime migration against a live installed desktop database is not yet exercised because native GTK/GLib linker packages are absent; the release build remains environment-blocked. SQLCipher uses its documented AES-256-CBC/HMAC mode, not AES-GCM.
 Next step: Run a desktop migration smoke test in an environment with GTK/GLib development packages, then package the Tauri application and inspect encrypted database headers.
+
+[2026-10-21] [12:48] — [Codex] — [isolated SQLCipher runtime smoke test]
+What changed: Executed a standalone SQLCipher runtime test using the same `libsqlite3-sys` bundled feature and SQLx version as the app. It exported a plaintext table into an encrypted database, confirmed the file header was not a SQLite plaintext header, reopened it with the key, and verified the original row.
+Why changed: Native Tauri runtime could not launch in this environment because GTK/GLib linker packages are missing; this isolates and verifies the database encryption/export behavior independently.
+Status: Working — smoke output `SQLCIPHER_SMOKE_OK header_encrypted=true value_preserved=true`. Native desktop migration and packaging remain unverified.
+Next step: Run the same migration through the Tauri app on a machine with GTK/GLib development dependencies, then inspect the installed app and encrypted database on disk.
