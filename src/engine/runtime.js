@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────────────────────
 import { OS } from './bridge.js';
 import { getSetting, addApproval, getDb, logSearchFailure } from '../data/db.js';
-import { emit, listen } from '@tauri-apps/api/event';
+import { emit } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { SearchService } from '../services/searchService.js';
 import { runWorker } from './workers/index.js';
@@ -241,6 +241,19 @@ export const SystemTools = [
 
 let keyCache = {};
 
+/** Hold critical actions until the owner explicitly decides; critical approvals never expire. */
+async function requestCriticalApproval(preview, actionType, source, path, onCreated) {
+  const approvalId = await addApproval(preview, actionType, '{}', source, 'Critical');
+  await emit('approval_requested', { approvalId, path });
+  await onCreated?.(approvalId);
+
+  // Reuse the canonical DB-polling gate: it cannot miss a fast event, survives
+  // route changes, and intentionally has no timeout for critical decisions.
+  const { ApprovalEngine } = await import('../services/approvalEngine.js');
+  await ApprovalEngine.waitForResolution(approvalId);
+  return 'approved';
+}
+
 export class AgentRuntime {
   constructor(tools = []) {
     this.tools = tools;
@@ -263,47 +276,26 @@ export class AgentRuntime {
     if (toolName.startsWith('mickii_fs_')) {
       const primitive = toolName.replace('mickii_fs_', '');
       if (primitive === 'create') {
-        console.log(`[Runtime] Pushing mickii_fs_create to approvals queue for path: ${args.path}`);
-        
         const previewContent = args.content ? args.content.substring(0, 150) + (args.content.length > 150 ? '...' : '') : 'Empty or Directory';
         const preview = `CREATE ${args.kind || 'file'}: ${args.path}\n\nPreview:\n${previewContent}`;
-        const approvalId = await addApproval(preview, 'File Creation', '{}', 'Cortex', 'High Risk');
-        
-        // Notify UI that an approval is pending
-        console.log('[Runtime] Emitting approval_requested event:', { approvalId, path: args.path });
-        await emit('approval_requested', { approvalId, path: args.path });
-        
-        // Block execution using Tauri events instead of DB polling
-        await new Promise(async (resolve, reject) => {
-          const unlisten = await listen('approval_action', (event) => {
-            const { approval_id: receivedId, action } = event.payload;
-            if (receivedId === approvalId) {
-              clearTimeout(timeout);
-              unlisten();
-              if (action === 'approved') {
-                resolve(true);
-              } else {
-                reject(new Error('User rejected the file creation.'));
-              }
-            }
-          });
-
-          const timeout = setTimeout(() => {
-            unlisten();
-            reject(new Error('Approval timeout — user did not respond within 60s'));
-          }, 60000);
-        });
-
+        await requestCriticalApproval(preview, 'File Creation', 'Cortex', args.path);
         const result = await OS.create(args.path, args.kind, args.content);
-        console.log(`[Runtime] mickii_fs_create success! Exact absolute path used: ${args.path}`);
         return result;
       }
       if (primitive === 'read') return await OS.read(args.path);
-      if (primitive === 'write') return await OS.write(args.path, args.content);
-      if (primitive === 'delete') return await OS.delete(args.path, args.recursive);
+      if (primitive === 'write') {
+        await requestCriticalApproval(`OVERWRITE FILE: ${args.path}\n\nNew content preview:\n${String(args.content || '').slice(0, 1500)}`, 'File Overwrite', 'Cortex', args.path);
+        return await OS.write(args.path, args.content);
+      }
+      if (primitive === 'delete') {
+        await requestCriticalApproval(`DELETE ${args.recursive ? 'RECURSIVELY' : 'FILE OR EMPTY DIRECTORY'}: ${args.path}`, 'File Deletion', 'Cortex', args.path);
+        return await OS.delete(args.path, args.recursive);
+      }
     }
     
     if (toolName === 'mickii_shell_run') {
+      const preview = `RUN LOCAL COMMAND\n\nCommand: ${args.command}\nArguments: ${JSON.stringify(args.args || [])}\nWorking directory: ${args.cwd || '(default)'}`;
+      await requestCriticalApproval(preview, 'Local Command Execution', 'Cortex', args.cwd || args.command);
       return await OS.shell(args.command, args.args, args.cwd);
     }
 
@@ -378,27 +370,10 @@ export class AgentRuntime {
         args.content.slice(0, 1500)
       ].join('\n');
 
-      const approvalId = await addApproval(preview, 'Website File Upload', '{}', 'Mickii Cortex', 'Critical');
-      await emit('approval_requested', { approvalId, path: args.remotePath });
-
       try {
-        await new Promise(async (resolve, reject) => {
-          const unlisten = await listen('approval_action', (event) => {
-            const { approval_id: receivedId, action } = event.payload;
-            if (receivedId === approvalId) {
-              clearTimeout(timeout);
-              unlisten();
-              if (action === 'approved') resolve(true);
-              else reject(new Error('rejected'));
-            }
-          });
-          const timeout = setTimeout(() => { unlisten(); reject(new Error('timeout')); }, 60000);
-        });
+        await requestCriticalApproval(preview, 'Website File Upload', 'Mickii Cortex', args.remotePath);
       } catch (e) {
-        const why = e.message === 'timeout'
-          ? 'owner ne time par approve nahi kiya'
-          : 'owner ne reject kar diya';
-        return JSON.stringify({ error: `Upload nahi hua — ${why}. Live site jaisा tha waisा hi hai (kuch nahi badla).` });
+        return JSON.stringify({ error: `Upload nahi hua — ${e.message}. Live site jaisi thi waisi hi hai.` });
       }
 
       try {
@@ -432,28 +407,7 @@ export class AgentRuntime {
       
       console.log(`[Runtime] Pushing mickii_cpanel_deploy to approvals queue for: ${args.localDir}`);
       const preview = `DEPLOY TO C-PANEL\n\nLocal Dir: ${args.localDir}\nRemote Dir: ${args.remoteDir}\nHost: ${host}`;
-      const approvalId = await addApproval(preview, 'C-Panel Deployment', '{}', 'Packager Worker', 'Critical');
-      await emit('approval_requested', { approvalId, path: args.localDir });
-      
-      await new Promise(async (resolve, reject) => {
-        const unlisten = await listen('approval_action', (event) => {
-          const { approval_id: receivedId, action } = event.payload;
-          if (receivedId === approvalId) {
-            clearTimeout(timeout);
-            unlisten();
-            if (action === 'approved') {
-              resolve(true);
-            } else {
-              reject(new Error('User rejected deployment.'));
-            }
-          }
-        });
-
-        const timeout = setTimeout(() => {
-          unlisten();
-          reject(new Error('Approval timeout.'));
-        }, 60000);
-      });
+      await requestCriticalApproval(preview, 'C-Panel Deployment', 'Packager Worker', args.localDir);
 
       console.log('[Runtime] Deployment approved, triggering Rust FTP client...');
       return await invoke('deploy_to_cpanel', { 
@@ -499,33 +453,19 @@ export class AgentRuntime {
     if (toolName === 'mickii_request_boss_approval') {
       try {
         console.log(`[Runtime] Mickii requesting boss approval: ${args.title}`);
-        const approvalId = await addApproval(args.description, args.title, '{}', 'Mickii (Cortex)', 'High Risk');
-        await emit('approval_requested', { approvalId, path: 'Mickii Strategy' });
-        
-        // Phase 2: WhatsApp Remote Approval Trigger
-        const bossPhone = await getSetting('boss_phone') || '+919999999999';
-        await WhatsAppService.sendTemplate(bossPhone, 'CRITICAL', {
-          worker_name: 'Mickii Cortex',
-          project_name: args.title,
-          amount: '0',
-          id: approvalId,
-          minutes: '120'
-        }).catch(err => console.log('[Runtime] WhatsApp failed:', err));
-
-        
-        const decision = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Approval timeout — user did not respond within 120s')), 120000);
-          listen('approval_action', (event) => {
-            const { approval_id: receivedId, action } = event.payload;
-            if (receivedId === approvalId) {
-              clearTimeout(timeout);
-              resolve(action);
-            }
-          }).then(unlisten => {
-            // Keep reference to unlisten if needed, but Tauri usually manages it.
-          });
-        });
-        
+        const decision = await requestCriticalApproval(
+          args.description,
+          args.title,
+          'Mickii (Cortex)',
+          'Mickii Strategy',
+          async (approvalId) => {
+            const bossPhone = await getSetting('boss_phone') || '+919999999999';
+            await WhatsAppService.sendTemplate(bossPhone, 'CRITICAL', {
+              worker_name: 'Mickii Cortex', project_name: args.title,
+              amount: '0', id: approvalId, minutes: '120'
+            }).catch(err => console.log('[Runtime] WhatsApp failed:', err));
+          }
+        );
         return JSON.stringify({ status: decision });
       } catch (err) {
         return JSON.stringify({ error: err.message });

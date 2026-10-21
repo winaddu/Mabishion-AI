@@ -1686,3 +1686,9 @@ What changed: Added complete local-preview snapshot/restore support so scheduled
 Why changed: Browser E2E surfaced repeated scheduled-backup errors in preview mode and one stale test expecting a removed service category. The project has system Chrome installed, so the E2E suite can run without downloading a browser.
 Status: Working — 373 unit/integration tests and 28 E2E tests pass; npm run build passes. Build still reports existing bundle-size and dynamic-import warnings. HawkScan remains unavailable in this environment.
 Next step: Continue production-readiness audit; verify Tauri-shell backup/restore and address local database encryption plus PIN recovery before calling the app production-ready.
+
+[2026-10-21] [12:41] — [Codex] — [src/engine/runtime.js, src/data/approvals.js, src/tests/unit/approvalTypeNormalization.test.js]
+What changed: Routed local file create/overwrite/delete, shell execution, FTP upload, hosting deployment, and Cortex approval requests through the canonical critical approval wait with no timeout. Fixed risk-tier normalization so both "High" and "Critical" store CRITICAL approvals. Added regression tests for case-insensitive critical/standard mapping.
+Why changed: Runtime side effects were not consistently approval-gated, several critical waits timed out after 60–120 seconds, and "Critical" was incorrectly downgraded to STANDARD by addApproval.
+Status: Working — 202 unit tests pass, build precheck passes all 378 tests, production build passes, 28 E2E tests pass, and git diff --check is clean. HawkScan is unavailable in this environment.
+Next step: Continue release-readiness audit; SQLCipher migration/recovery and production Tauri-shell validation remain open.

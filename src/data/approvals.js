@@ -13,11 +13,12 @@ export async function addApproval(preview, action_type, context, source, risk_le
   const db = await getDb();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
-  // Safe backward compatibility mapping
+  const normalizedRisk = String(risk_level || '').trim().toLowerCase();
+  const approvalType = ['high', 'critical'].includes(normalizedRisk) ? 'critical' : 'standard';
   await db.execute(
     `INSERT INTO approvals (id, title, type, project_id, worker_name, request_data, status, expires_at, owner_notified, whatsapp_sent, owner_notes) 
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [id, preview, normalizeApprovalType(risk_level === 'High' ? 'critical' : 'standard'), '', normalizeWorkerId(action_type), JSON.stringify({ context, source }), 'pending', now, 0, 0, '']
+    [id, preview, normalizeApprovalType(approvalType), '', normalizeWorkerId(action_type), JSON.stringify({ context, source }), 'pending', now, 0, 0, '']
   );
   return id;
 }
