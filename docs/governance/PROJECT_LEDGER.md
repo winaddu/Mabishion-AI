@@ -1698,3 +1698,9 @@ What changed: Added direct runtime tests proving file creation, overwrite, delet
 Why changed: The approval-gate refactor protects local and remote side effects and needs behavioral tests at the dispatcher boundary, not only approval-engine unit coverage.
 Status: Working — all 383 tests pass and production build passes. E2E remains 28/28 pass from this session; git diff --check is clean.
 Next step: Complete the SQLCipher/key recovery and Tauri packaging readiness review.
+
+[2026-10-21] [12:43] — [Codex] — [src-tauri release build verification]
+What changed: Attempted a production Tauri release build with `npx tauri build --no-bundle`; no project code was changed for this check.
+Why changed: Verify the native desktop integration in addition to the browser production build.
+Status: Blocked — frontend build and all 383 tests pass, but native release compilation stops at `glib-sys` because `pkg-config` is not installed in the environment. HawkScan is also unavailable. No system package was installed.
+Next step: Provide `pkg-config` and GTK/GLib development dependencies in the build environment, then rerun native packaging; SQLCipher key lifecycle/migration remains unresolved.
