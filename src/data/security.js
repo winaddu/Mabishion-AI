@@ -2,6 +2,29 @@
 import { getDb, saveDevelopmentPreviewDb } from './core.js';
 import { invoke } from '@tauri-apps/api/core';
 
+const REQUIRED_BACKUP_TABLES = ['projects', 'leads', 'approvals', 'settings'];
+const SQLITE_USER_TABLES_QUERY = `
+  SELECT name FROM pragma_table_list
+  WHERE schema = 'main' AND type = 'table' AND name NOT LIKE 'sqlite_%'
+  ORDER BY name
+`;
+
+function quoteSqliteIdentifier(identifier) {
+  if (typeof identifier !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error('Backup contains an invalid SQL identifier.');
+  }
+  return `"${identifier}"`;
+}
+
+async function getUserTableNames(db) {
+  const rows = await db.select(SQLITE_USER_TABLES_QUERY);
+  const names = (rows || []).map(row => row.name).filter(name =>
+    typeof name === 'string' && !name.startsWith('sqlite_')
+  );
+  if (names.length === 0) throw new Error('Could not read database table list; backup/restore was cancelled.');
+  return new Set(names);
+}
+
 export async function executeTransaction(queries) {
   const db = await getDb();
   if (!window.__TAURI_INTERNALS__) {
@@ -37,20 +60,13 @@ export async function executeTransaction(queries) {
 
 export async function backupDatabase() {
   const db = await getDb();
-  const tables = [
-    'projects', 'leads', 'approvals', 'skills', 'revenue',
-    'workflows', 'workflow_nodes', 'workflow_connections',
-    'knowledge_sources', 'analyst_reports', 'settings',
-    'whatsapp_logs', 'action_ledger', 'llm_usage', 'cron_logs'
-  ];
-  
+  const tables = await getUserTableNames(db);
   const backupData = {};
-  for (const table of tables) {
-    try {
-      backupData[table] = await db.select(`SELECT * FROM ${table}`);
-    } catch (e) {
-      backupData[table] = [];
-    }
+  for (const table of [...tables].sort()) {
+    const safeTable = quoteSqliteIdentifier(table);
+    // Fail the export if any table cannot be read. Returning [] here would create
+    // a valid-looking backup that silently loses data when restored.
+    backupData[table] = await db.select(`SELECT * FROM ${safeTable}`);
   }
   return JSON.stringify(backupData, null, 2);
 }
@@ -58,11 +74,11 @@ export async function backupDatabase() {
 export function validateBackupIntegrity(jsonString) {
   try {
     const data = JSON.parse(jsonString);
-    const requiredTables = ['projects', 'leads', 'approvals', 'settings'];
-    const missing = requiredTables.filter(t => !(t in data));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return { valid: false, reason: 'Invalid backup format' };
+    const missing = REQUIRED_BACKUP_TABLES.filter(t => !(t in data));
     if (missing.length > 0) return { valid: false, reason: `Missing tables: ${missing.join(', ')}` };
-    // Check it's an object (not an array or primitive)
-    if (typeof data !== 'object' || Array.isArray(data)) return { valid: false, reason: 'Invalid backup format' };
+    const invalidTables = Object.entries(data).filter(([, rows]) => !Array.isArray(rows)).map(([table]) => table);
+    if (invalidTables.length > 0) return { valid: false, reason: `Invalid row list for: ${invalidTables.join(', ')}` };
     const tableCount = Object.keys(data).length;
     const totalRows = Object.values(data).reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0);
     return { valid: true, tableCount, totalRows };
@@ -74,19 +90,38 @@ export function validateBackupIntegrity(jsonString) {
 export async function restoreDatabase(jsonString) {
   const db = await getDb();
   const backupData = JSON.parse(jsonString);
+  const integrity = validateBackupIntegrity(jsonString);
+  if (!integrity.valid) throw new Error(`Backup integrity check failed: ${integrity.reason}`);
+
+  const existingTables = await getUserTableNames(db);
   const tables = Object.keys(backupData);
+  const unknownTables = tables.filter(table => !existingTables.has(table));
+  if (unknownTables.length > 0) {
+    throw new Error(`Backup contains tables unavailable in this database: ${unknownTables.join(', ')}`);
+  }
 
   const txQueries = [];
   for (const table of tables) {
-    txQueries.push({ query: `DELETE FROM ${table}`, params: [] });
+    const safeTable = quoteSqliteIdentifier(table);
+    const columns = await db.select(`PRAGMA table_info(${safeTable})`);
+    const allowedColumns = new Set((columns || []).map(column => column.name));
+    if (allowedColumns.size === 0) throw new Error(`Database schema for table "${table}" could not be read.`);
+
+    txQueries.push({ query: `DELETE FROM ${safeTable}`, params: [] });
     const rows = backupData[table] || [];
     for (const row of rows) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) {
+        throw new Error(`Backup contains an invalid row in table "${table}".`);
+      }
       const keys = Object.keys(row);
-      const cols = keys.join(', ');
+      if (keys.length === 0 || keys.some(key => !allowedColumns.has(key))) {
+        throw new Error(`Backup contains unknown columns in table "${table}".`);
+      }
+      const cols = keys.map(quoteSqliteIdentifier).join(', ');
       const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
       const vals = keys.map(k => row[k]);
       txQueries.push({
-        query: `INSERT INTO ${table} (${cols}) VALUES (${placeholders})`,
+        query: `INSERT INTO ${safeTable} (${cols}) VALUES (${placeholders})`,
         params: vals
       });
     }

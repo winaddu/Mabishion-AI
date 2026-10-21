@@ -1674,3 +1674,9 @@ Next step: floating 11 workers ko proper trigger dena (UI button ya pipeline/Mic
  • Build result: ✅ `npm run build` passed in ~2.16s. All 366 tests pass (1 test updated, zero regressions).
  • Status: Working — Build ✓
  • Principle going forward: simplification means visible surface area goes DOWN — fewer screens in nav, fewer commands shown, fewer named personas — not "add new things carefully while keeping all old things for safety." Safety and simplicity are different axes; owner is explicitly prioritizing the latter.
+
+[2026-10-21] [12:31] — [Codex] — [src/data/security.js, src/tests/unit/backupRestore.test.js]
+What changed: Database backups now discover and export all SQLite user tables, fail on unreadable tables instead of writing incomplete snapshots, validate restore table/column identifiers against the active schema, and reject malformed table rows before executing restore SQL. Added six focused backup/restore tests.
+Why changed: Owner requested the project be completed and fully working. Review found exports only covered 15 hardcoded tables while the app schema has substantially more, and restore accepted SQL identifiers directly from backup JSON.
+Status: Working — 372 tests pass; npm run build passes. Existing large-bundle and dynamic-import warnings remain. HawkScan could not run because the skill/runtime/API key is unavailable in this environment.
+Next step: Continue production-readiness audit; database encryption and PIN-gate behavior need a safe recovery design before activation.
