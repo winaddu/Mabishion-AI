@@ -1735,3 +1735,9 @@ What changed:
 Why changed: Rigorous code review of recent commits and core execution flows revealed CI workflow breakage, C1 approval timeout conflicts, and runtime response crashes.
 Status: Working — All 383 unit tests pass; all 28 Playwright E2E tests pass; production bundle build passes in ~1.56s; `cargo check` passes cleanly.
 Next step: Ready for desktop packaging in environment with GTK/GLib development dependencies.
+
+[2026-10-26] — [Codex] — [docs/SALE_READINESS_REVIEW.md, docs/governance/PROJECT_LEDGER.md]
+What changed: Added a local source-code sale assessment covering reviewed scope, verified checks, buyer-fit hypotheses, marketplace sources, material execution/privacy/security findings, and proposed rebrand boundaries. No application code, brand, live customer data, credentials, or business rules changed; no listing or outreach was performed.
+Why changed: Owner asked whether the unfinished project could be sold under a different name and requested a code/document review before advice.
+Status: Partially Verified — 383 tests across 33 files pass; frontend production build passes; 28 browser-preview E2E tests pass; cargo check --offline passes. Fresh native installation, real provider/payment/WhatsApp/deployment paths, full line-by-line file review, ownership/license diligence, and buyer demand are not verified. Source review found undefined productType in DeveloperWorker, failure-as-success paths, internal blueprint inclusion in client ZIPs, packaging side effects before output approval, simulated WhatsApp, plaintext secret/backups limitations, and stale documentation. No fixes were made in this assessment.
+Next step: Owner chooses exclusive source-code transfer versus nonexclusive licensing; prepare a separate clean transfer copy and a demonstrated workflow before any public listing or handover. New brand requires owner selection. Assessment remains local pending any publication decision.
