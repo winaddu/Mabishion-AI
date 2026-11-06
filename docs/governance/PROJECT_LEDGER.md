@@ -1741,3 +1741,9 @@ What changed: Added a local source-code sale assessment covering reviewed scope,
 Why changed: Owner asked whether the unfinished project could be sold under a different name and requested a code/document review before advice.
 Status: Partially Verified — 383 tests across 33 files pass; frontend production build passes; 28 browser-preview E2E tests pass; cargo check --offline passes. Fresh native installation, real provider/payment/WhatsApp/deployment paths, full line-by-line file review, ownership/license diligence, and buyer demand are not verified. Source review found undefined productType in DeveloperWorker, failure-as-success paths, internal blueprint inclusion in client ZIPs, packaging side effects before output approval, simulated WhatsApp, plaintext secret/backups limitations, and stale documentation. No fixes were made in this assessment.
 Next step: Owner chooses exclusive source-code transfer versus nonexclusive licensing; prepare a separate clean transfer copy and a demonstrated workflow before any public listing or handover. New brand requires owner selection. Assessment remains local pending any publication decision.
+
+[2026-11-06] [Codex] — [src/engine/workers/developerWorker.js, src/tests/unit/developerWorker.test.js]
+What changed: Fixed the undefined projectType reference in DeveloperWorker complexity analysis and removed the dummy-module fallback. Missing or invalid provider output now fails clearly before any code_modules row is written. Added regression coverage for empty, incomplete, and invalid generation responses.
+Why changed: The cleanup audit reproduced a runtime ReferenceError and found that failed generation could be reported as a successful placeholder deliverable.
+Status: Working — 387 tests pass; production build passes.
+Next step: Native Tauri packaging remains environment-blocked by missing GTK/GLib development packages.
